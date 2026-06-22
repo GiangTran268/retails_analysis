@@ -1,5 +1,39 @@
--- Create table products_summary
+-- Calculate revenue, profit, orders, and customers per month (sales_time)
 SELECT
+    YEAR(retails.sales.order_date) AS order_year,
+    MONTH(retails.sales.order_date) AS month_number,
+    DATENAME(MONTH, retails.sales.order_date) AS month_name,
+
+    -- useful for sorting if needed
+    FORMAT(retails.sales.order_date, 'yyyy-MM') AS year_month,
+
+    COUNT(DISTINCT retails.sales.order_number) AS number_of_orders,
+    COUNT(DISTINCT retails.sales.customer_key) AS number_of_customers,
+
+    SUM(retails.sales.quantity * retails.products.unit_price_usd) AS total_revenue,
+    SUM(retails.sales.quantity * 
+        (retails.products.unit_price_usd - retails.products.unit_cost_usd)) AS total_profit
+
+FROM retails.sales
+
+LEFT JOIN retails.products
+    ON retails.sales.product_key = retails.products.product_key
+
+GROUP BY
+    YEAR(retails.sales.order_date),
+    MONTH(retails.sales.order_date),
+    DATENAME(MONTH, retails.sales.order_date),
+    FORMAT(retails.sales.order_date, 'yyyy-MM')
+
+ORDER BY
+    order_year,
+    month_number;
+
+
+-- Create table product_sum by year
+SELECT
+    YEAR(retails.sales.order_date) AS order_year,
+    
     retails.products.product_key,
     retails.products.product_name,
     retails.products.brand,
@@ -16,72 +50,166 @@ SELECT
     SUM(retails.sales.quantity * (retails.products.unit_price_usd - retails.products.unit_cost_usd)) AS profit,
     
     -- Profit margin
-    SUM(retails.sales.quantity * (retails.products.unit_price_usd - retails.products.unit_cost_usd)) 
-    / SUM(retails.sales.quantity * retails.products.unit_price_usd) AS profit_margin
+    SUM(retails.sales.quantity * (retails.products.unit_price_usd - retails.products.unit_cost_usd)) * 1.0
+    / NULLIF(SUM(retails.sales.quantity * retails.products.unit_price_usd), 0) AS profit_margin
 
 FROM retails.products
 LEFT JOIN retails.sales
     ON retails.products.product_key = retails.sales.product_key
+
 GROUP BY
+    YEAR(retails.sales.order_date),
     retails.products.product_key,
     retails.products.product_name,
     retails.products.brand,
     retails.products.subcategory,
-    retails.products.category;
-
--- Create table customers_summary
-SELECT 
-    retails.customers.customer_key,
-    retails.customers.name
-    retails.customers.gender,
-    retails.customers.city,
-    retails.customers.state,
-    retails.customers.country,
-    
-    -- Calculate age
-    DATEDIFF(YEAR, retails.customers.birthday, GETDATE()) AS age,
-    
-     -- Count distinct orders
-    COUNT(DISTINCT retails.sales.order_number) AS number_of_orders,
-    
-    -- Calculate Revenue per Customer
-    SUM(retails.sales.quantity * retails.products.unit_price_usd) AS total_revenue,
-    
-    -- Average Order Value (AOV)
-    SUM(retails.sales.quantity * retails.products.unit_price_usd) / COUNT(DISTINCT retails.sales.order_number) AS avg_order_value
-
-FROM retails.customers
-LEFT JOIN retails.sales
-    ON retails.customers.customer_key = retails.sales.customer_key    
-LEFT JOIN retails.products
-	ON retails.sales.product_key = retails.products.product_key 
-
-GROUP BY 
-    retails.customers.customer_key,
-    retails.customers.gender,
-    retails.customers.city,
-    retails.customers.state,
-    retails.customers.country,
-    retails.customers.birthday;
-
--- Calculate revenue and profit per month and per year
-SELECT
-    YEAR(retails.sales.order_date) AS order_year,
-    MONTH(retails.sales.order_date) AS order_month,
-    DATENAME(MONTH, retails.sales.order_date) AS month_name,
-
-    SUM(retails.sales.quantity * retails.products.unit_price_usd) AS total_revenue,
-    SUM(retails.sales.quantity * (retails.products.unit_price_usd - retails.products.unit_cost_usd)) AS total_profit
-
-FROM retails.sales
-LEFT JOIN retails.products
-    ON retails.sales.product_key = retails.products.product_key
-
-GROUP BY
-    YEAR(retails.sales.order_date),
-    MONTH(retails.sales.order_date),
-    DATENAME(MONTH, retails.sales.order_date)
+    retails.products.category
 
 ORDER BY
     order_year,
-    order_month;
+    revenue_of_goods DESC;
+
+
+-- Sales by country and year, separating online and offline (offline_sum)
+SELECT
+    YEAR(s.order_date) AS order_year,
+
+    CASE
+        WHEN st.country = 'Online'
+          OR st.state = 'Online'
+        THEN 'Online'
+        ELSE 'Offline'
+    END AS sales_channel,
+
+    CASE
+        WHEN st.country = 'Online'
+          OR st.state = 'Online'
+        THEN NULL
+        ELSE st.country
+    END AS country,
+
+    COUNT(DISTINCT s.order_number) AS number_of_orders,
+    COUNT(DISTINCT s.customer_key) AS number_of_customers,
+    SUM(s.quantity) AS number_of_goods_sold,
+    SUM(s.quantity * p.unit_price_usd) AS total_revenue,
+    SUM(s.quantity * (p.unit_price_usd - p.unit_cost_usd)) AS total_profit
+
+FROM retails.sales s
+LEFT JOIN retails.products p
+    ON s.product_key = p.product_key
+LEFT JOIN retails.stores st
+    ON s.store_key = st.store_key
+
+GROUP BY
+    YEAR(s.order_date),
+    CASE
+        WHEN st.country = 'Online'
+          OR st.state = 'Online'
+        THEN 'Online'
+        ELSE 'Offline'
+    END,
+    CASE
+        WHEN st.country = 'Online'
+          OR st.state = 'Online'
+        THEN NULL
+        ELSE st.country
+    END
+
+ORDER BY
+    order_year,
+    sales_channel,
+    country;
+
+
+-- Create table store_sum
+SELECT
+    YEAR(s.order_date) AS order_year,
+    st.store_key,
+    st.country,
+    st.state,
+    st.square_meters,
+
+    COUNT(DISTINCT s.order_number) AS number_of_orders,
+    COUNT(DISTINCT s.customer_key) AS number_of_customers,
+    SUM(s.quantity) AS number_of_goods_sold,
+
+    SUM(s.quantity * p.unit_price_usd) AS total_revenue,
+    SUM(s.quantity * (p.unit_price_usd - p.unit_cost_usd)) AS total_profit,
+
+    SUM(s.quantity * (p.unit_price_usd - p.unit_cost_usd)) * 1.0
+        / NULLIF(st.square_meters, 0) AS profit_per_m2
+
+FROM retails.sales s
+LEFT JOIN retails.products p
+    ON s.product_key = p.product_key
+LEFT JOIN retails.stores st
+    ON s.store_key = st.store_key
+
+WHERE NOT (
+    st.country = 'Online'
+    OR st.state = 'Online'
+)
+
+GROUP BY
+    YEAR(s.order_date),
+    st.store_key,
+    st.country,
+    st.state,
+    st.square_meters
+
+ORDER BY
+    order_year,
+    profit_per_m2 DESC;
+
+
+-- Create table customer_sum
+SELECT
+    s.order_number,
+    s.order_date,
+    YEAR(s.order_date) AS order_year,
+
+    -- Customer info
+    c.customer_key,
+    c.name AS customer_name,
+    c.gender,
+    c.birthday,
+    DATEDIFF(YEAR, c.birthday, GETDATE()) AS age,
+
+    -- Store / order location
+    st.store_key,
+    st.country,
+    st.state,
+
+    -- Order revenue
+    SUM(s.quantity * p.unit_price_usd) AS order_revenue,
+
+    -- Order profit
+    SUM(s.quantity * (p.unit_price_usd - p.unit_cost_usd)) AS order_profit,
+
+    -- Quantity in the order
+    SUM(s.quantity) AS total_quantity
+
+FROM retails.sales s
+LEFT JOIN retails.customers c
+    ON s.customer_key = c.customer_key
+LEFT JOIN retails.products p
+    ON s.product_key = p.product_key
+LEFT JOIN retails.stores st
+    ON s.store_key = st.store_key
+
+GROUP BY
+    s.order_number,
+    s.order_date,
+    YEAR(s.order_date),
+    c.customer_key,
+    c.name,
+    c.gender,
+    c.birthday,
+    DATEDIFF(YEAR, c.birthday, GETDATE()),
+    st.store_key,
+    st.country,
+    st.state
+
+ORDER BY
+    s.order_date,
+    s.order_number;
