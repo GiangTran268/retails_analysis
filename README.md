@@ -113,7 +113,7 @@ Channel-level analysis can help identify where specific products or customer gro
 ## 5. Recommendations
 Based on the analysis, the business should consider the following actions.
 
-### 5.1Product and Inventory Strategy
+### 5.1 Product and Inventory Strategy
 Prioritise high-revenue and high-margin products in inventory planning.
 Maintain sufficient stock levels for products with consistently strong demand.
 Review products with high sales volume but low profit margins.
