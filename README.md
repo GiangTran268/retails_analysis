@@ -1,6 +1,7 @@
 # XDA Retail Sales Analysis
 *Tools Used: SQL & Power BI*
-Refer to the file (report/Retail_dashboard.pbix) for a detailed and interactive report.
+
+Refer to the file [BI Dashboard](report/Retail_dashboard.pbix) for a detailed and interactive report.
 ## 1. Project Overview
 
 This project analyses retail sales data using SQL and Power BI.
